@@ -1,81 +1,48 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
-from icecream import ic
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.configurations.database import get_async_session
-from src.models.books import Book
 from src.schemas import IncomingBook, ReturnedAllBooks, ReturnedBook
+import src.services.books as book_service
+
 
 books_router = APIRouter(tags=["books"], prefix="/books")
-
-# Больше не симулируем хранилище данных. Подключаемся к реальному, через сессию.
 DBSession = Annotated[AsyncSession, Depends(get_async_session)]
 
 
-# Ручка для создания записи о книге в БД. Возвращает созданную книгу.
-@books_router.post("/", response_model=ReturnedBook, status_code=status.HTTP_201_CREATED)  # Прописываем модель ответа
-async def create_book(
-    book: IncomingBook, session: DBSession
-):  # прописываем модель валидирующую входные данные и сессию как зависимость.
-    # это - бизнес логика. Обрабатываем данные, сохраняем, преобразуем и т.д.
-    new_book = Book(
-        title=book.title,
-        author=book.author,
-        year=book.year,
-        count_pages=book.count_pages,
-        seller_id=book.seller_id
-    )
-    session.add(new_book)
-    await session.flush()
-
+@books_router.post("/", response_model=ReturnedBook, status_code=status.HTTP_201_CREATED)
+async def create_book(book: IncomingBook, session: DBSession):
+    new_book = await book_service.create_book(book, session)
     return new_book
 
 
-# Ручка, возвращающая все книги
 @books_router.get("/", response_model=ReturnedAllBooks)
 async def get_all_books(session: DBSession):
-    # Хотим видеть формат:
-    # books: [{"id": 1, "title": "Blabla", ...}, {"id": 2, ...}]
-    query = select(Book)
-    res = await session.execute(query)
-    books = res.scalars().all()
-    return {"books": books}
+    books = await book_service.get_all_books(session)
+    return books
 
 
-# Ручка для получения книги по ее ИД
 @books_router.get("/{book_id}", response_model=ReturnedBook)
 async def get_book(book_id: int, session: DBSession):
-    res = await session.get(Book, book_id)
-    return res
+    book = await book_service.get_book(book_id, session)
+    if not book:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return book
 
 
-# Ручка для удаления книги
 @books_router.delete("/{book_id}")
 async def delete_book(book_id: int, session: DBSession):
-    deleted_book = await session.get(Book, book_id)
-    ic(deleted_book)  # Красивая и информативная замена для print. Полезна при отладке.
-    if deleted_book:
-        await session.delete(deleted_book)
-
-    return Response(status_code=status.HTTP_204_NO_CONTENT)  # Response может вернуть текст и метаданные.
+    deleted_book = await book_service.delete_book(book_id, session)
+    if not deleted_book:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# Ручка для обновления данных о книге
-@books_router.put("/{book_id}")
-async def update_book(book_id: int, new_data: ReturnedBook, session: DBSession):
-    # Оператор "морж", позволяющий одновременно и присвоить значение и проверить его.
-    if updated_book := await session.get(Book, book_id):
-        updated_book.author = new_data.author
-        updated_book.title = new_data.title
-        updated_book.year = new_data.year
-        updated_book.count_pages = new_data.count_pages
-        updated_book.seller_id = new_data.seller_id
-
-        await session.flush()
-
-        return updated_book
-
-    return Response(status_code=status.HTTP_404_NOT_FOUND)
+@books_router.put("/{book_id}", response_model=ReturnedBook)
+async def update_book(book_id: int, new_data: IncomingBook, session: DBSession):
+    updated_book = await book_service.update_book(book_id, new_data, session)
+    if not updated_book:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return updated_book

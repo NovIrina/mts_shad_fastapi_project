@@ -8,6 +8,7 @@ import asyncio
 import httpx
 import pytest
 import pytest_asyncio
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.configurations.settings import settings
@@ -31,10 +32,13 @@ async_test_session = async_sessionmaker(async_test_engine, expire_on_commit=Fals
 
 @pytest_asyncio.fixture(scope="function")
 async def mock_seller(db_session):
+    await db_session.execute(delete(Seller).where(Seller.email == "mock@mockmail.com"))
+    await db_session.commit()
+
     seller = Seller(first_name="Mock", last_name="Mocker", email="mock@mockmail.com",
                     password="mock123")
     db_session.add(seller)
-    await db_session.flush()
+    await db_session.commit()
     return seller
 
 

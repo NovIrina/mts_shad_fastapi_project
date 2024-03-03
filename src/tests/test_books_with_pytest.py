@@ -8,8 +8,9 @@ from src.models import books
 # Тест на ручку создающую книгу
 @pytest.mark.asyncio
 async def test_create_book(async_client, mock_seller):
-    data = {"title": "Wrong Code", "author": "Robert Martin", "pages": 104, "year": 2007,
-            "seller_id": mock_seller.id}
+    mock_seller_id = mock_seller.id
+    data = {"title": "Wrong Code", "author": "Robert Martin", "count_pages": 104, "year": 2007,
+            "seller_id": mock_seller_id}
     response = await async_client.post("/api/v1/books/", json=data)
 
     assert response.status_code == status.HTTP_201_CREATED
@@ -22,7 +23,7 @@ async def test_create_book(async_client, mock_seller):
         "author": "Robert Martin",
         "count_pages": 104,
         "year": 2007,
-        "seller_id": mock_seller.id
+        "seller_id": mock_seller_id
     }
 
 
@@ -31,10 +32,11 @@ async def test_create_book(async_client, mock_seller):
 async def test_get_books(db_session, async_client, mock_seller):
     # Создаем книги вручную, а не через ручку, чтобы нам не попасться на ошибку которая
     # может случиться в POST ручке
+    mock_seller_id = mock_seller.id
     book = books.Book(author="Pushkin", title="Eugeny Onegin", year=2001, count_pages=104,
-                      seller_id=mock_seller.id)
+                      seller_id=mock_seller_id)
     book_2 = books.Book(author="Lermontov", title="Mziri", year=1997, count_pages=104,
-                        seller_id=mock_seller.id)
+                        seller_id=mock_seller_id)
 
     db_session.add_all([book, book_2])
     await db_session.flush()
@@ -49,9 +51,9 @@ async def test_get_books(db_session, async_client, mock_seller):
     assert response.json() == {
         "books": [
             {"title": "Eugeny Onegin", "author": "Pushkin", "year": 2001, "id": book.id,
-             "count_pages": 104, "seller_id": mock_seller.id},
+             "count_pages": 104, "seller_id": mock_seller_id},
             {"title": "Mziri", "author": "Lermontov", "year": 1997, "id": book_2.id,
-             "count_pages": 104, "seller_id": mock_seller.id},
+             "count_pages": 104, "seller_id": mock_seller_id},
         ]
     }
 
@@ -111,8 +113,9 @@ async def test_delete_book(db_session, async_client, mock_seller):
 async def test_update_book(db_session, async_client, mock_seller):
     # Создаем книги вручную, а не через ручку, чтобы нам не попасться на ошибку которая
     # может случиться в POST ручке
+    mock_seller_id = mock_seller.id
     book = books.Book(author="Pushkin", title="Eugeny Onegin", year=2001, count_pages=104,
-                      seller_id=mock_seller.id)
+                      seller_id=mock_seller_id)
 
     db_session.add(book)
     await db_session.flush()
@@ -120,7 +123,7 @@ async def test_update_book(db_session, async_client, mock_seller):
     response = await async_client.put(
         f"/api/v1/books/{book.id}",
         json={"title": "Mziri", "author": "Lermontov", "count_pages": 100, "year": 2007,
-              "id": book.id, "seller_id": mock_seller.id},
+              "id": book.id, "seller_id": mock_seller_id},
     )
 
     assert response.status_code == status.HTTP_200_OK
