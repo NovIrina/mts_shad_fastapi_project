@@ -8,12 +8,14 @@ import asyncio
 import httpx
 import pytest
 import pytest_asyncio
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.configurations.settings import settings
 from src.models import books  # noqa
 from src.models.base import BaseModel
 from src.models.books import Book  # noqa F401
+from src.models.sellers import Seller
 
 # Переопределяем движок для запуска тестов и подключаем его к тестовой базе.
 # Это решает проблему с сохранностью данных в основной базе приложения.
@@ -26,6 +28,18 @@ async_test_engine = create_async_engine(
 
 # Создаем фабрику сессий для тестового движка.
 async_test_session = async_sessionmaker(async_test_engine, expire_on_commit=False, autoflush=False)
+
+
+@pytest_asyncio.fixture(scope="function")
+async def mock_seller(db_session):
+    await db_session.execute(delete(Seller).where(Seller.email == "mock@mockmail.com"))
+    await db_session.commit()
+
+    seller = Seller(first_name="Mock", last_name="Mocker", email="mock@mockmail.com",
+                    password="mock123")
+    db_session.add(seller)
+    await db_session.commit()
+    return seller
 
 
 # Получаем цикл событий для асинхорнного потока выполнения задач.
